@@ -84,6 +84,12 @@ style/lighting). The full 13-string set is from the official `prompt_enhancer.py
   is dramatically crisper than a 480p draft — faces, hair, and fine texture especially. 480p
   (`--max-size 832`) is the model's native comfort zone and ~3× faster; use it to iterate, then finalize
   at the default. Verified directly: at 480p, steps 6/8/10 look the same; 720p is the real jump.
+- **Don't go past 720p for batch work.** 1080p (`--max-size 1920`) is a *marginal* per-frame gain over
+  720p and the time cost is **super-linear**, not linear: measured on a 5090 (portrait rv2v), 720p·81f =
+  ~5.5 min, 1080p·**25f** = ~3 min, but 1080p·**81f** did not finish in 60 min (VRAM pinned ~32 GB, no
+  OOM — it's offload pressure below the ceiling, not compute). Resolution is also **orthogonal to motion**:
+  the temporal latent structure is identical at any resolution, so higher res buys spatial detail per
+  frame, not smoother transitions. Reserve 1080p for short one-off hero shots; keep batches at 720p/480p.
 
 ## Troubleshooting
 
