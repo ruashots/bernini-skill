@@ -36,7 +36,14 @@ LORA_HI_STR = 3.0
 LORA_LO_STR = 1.5
 CLIP    = "umt5_xxl_fp16.safetensors"
 VAE     = "wan_2.1_vae.safetensors"
-NEG_DEFAULT = "bad video"
+# The standard Wan-2.2 negative prompt — the official bytedance/Bernini CLI default
+# (DEFAULT_NEG_PROMPT in cli.py). The Comfy example workflow's "bad video" is just a placeholder.
+NEG_DEFAULT = (
+    "色调艳丽，过曝，静态，细节模糊不清，字幕，风格，作品，画作，画面，静止，整体发灰，"
+    "最差质量，低质量，JPEG压缩残留，丑陋的，残缺的，多余的手指，画得不好的手部，"
+    "画得不好的脸部，畸形的，毁容的，形态畸形的肢体，手指融合，静止不动的画面，"
+    "杂乱的背景，三条腿，背景人很多，倒着走"
+)
 
 # ---- the 13 task system prompts, verbatim from bytedance/Bernini prompt_enhancer.py SYSTEM_PROMPTS ----
 SYSTEM_PROMPTS = {
@@ -343,7 +350,9 @@ def run(a):
         W = a.width or (1280 if out_kind == "video" else 1024)
         H = a.height or (720 if out_kind == "video" else 1024)
         W, H = snap16(W), snap16(H)
-        length = 1 if out_kind == "image" else snap_len(a.frames or 81)
+        # t2i/r2i: Bernini is a VIDEO model — a lone frame (length=1) is out-of-distribution and
+        # comes out waxy/over-sharpened. Render a SHORT clip and keep the middle frame instead.
+        length = snap_len(a.img_frames) if out_kind == "image" else snap_len(a.frames or 81)
 
     steps = a.steps
     split = a.split if a.split is not None else max(1, round(steps * 0.5))   # hi 0..split, lo split..steps
@@ -365,8 +374,11 @@ def run(a):
     if a.prompt: print(f"   prompt: {a.prompt[:90]}{'…' if len(a.prompt)>90 else ''}")
 
     pid = post(g); st, outs = poll(pid); print("status:", st)
-    ext = ".mp4" if out_kind == "video" else ".png"
-    main = next((os.path.join(OUT, sub, fn) for nid, fn, sub in outs if fn.endswith(ext)), None)
+    if out_kind == "image":
+        imgs = sorted(os.path.join(OUT, sub, fn) for nid, fn, sub in outs if fn.lower().endswith(".png"))
+        main = imgs[len(imgs) // 2] if imgs else None     # middle frame of the short clip
+    else:
+        main = next((os.path.join(OUT, sub, fn) for nid, fn, sub in outs if fn.lower().endswith(".mp4")), None)
     if not main:
         main = next((os.path.join(OUT, sub, fn) for nid, fn, sub in outs), None)
     if not main: print("no output produced (status %s). Check ComfyUI console." % st); sys.exit(2)
@@ -387,6 +399,7 @@ def main():
     ap.add_argument("--prompt", "-p", default="", help="edit instruction / scene description (the 3-part Bernini prompt)")
     ap.add_argument("--negative", default=NEG_DEFAULT, help='negative prompt (default "%s")' % NEG_DEFAULT)
     ap.add_argument("--frames", type=int, default=0, help="frame count for video tasks (snapped to 8n+1; default 81 / source)")
+    ap.add_argument("--img-frames", dest="img_frames", type=int, default=9, help="t2i/r2i render this many frames (8n+1) and keep the middle one — a lone frame is OOD for this video model and looks waxy; 1 = fast/low-quality")
     ap.add_argument("--width", type=int, default=0, help="override width (default: from source aspect / 1280 video / 1024 image)")
     ap.add_argument("--height", type=int, default=0, help="override height")
     ap.add_argument("--max-size", dest="max_size", type=int, default=1280, help="long-edge cap when deriving size from source (default 1280=720p; use 832 for a fast 480p draft)")

@@ -10,7 +10,7 @@ pose/depth maps — editing is maskless and instruction-driven.
 The engine builds this graph (programmatically, per task):
 
 1. **Text** — `CLIPLoader(umt5_xxl, type=wan)` → two `CLIPTextEncode` (positive = the task system prompt +
-   your prompt; negative = `"bad video"`).
+   your prompt; negative = the standard Wan-2.2 negative prompt, the official CLI default).
 2. **Conditioning** — `BerniniConditioning` takes positive/negative, the VAE, `width/height/length`, and
    the optional `source_video` / `reference_video` / `reference_images` (autogrow 0–8). It VAE-encodes each
    connected stream (order: source_video → reference_video → each reference image), resizes the source to
@@ -84,6 +84,17 @@ style/lighting). The full 13-string set is from the official `prompt_enhancer.py
   is dramatically crisper than a 480p draft — faces, hair, and fine texture especially. 480p
   (`--max-size 832`) is the model's native comfort zone and ~3× faster; use it to iterate, then finalize
   at the default. Verified directly: at 480p, steps 6/8/10 look the same; 720p is the real jump.
+- **Single-frame image gen (t2i/r2i) needs a short clip, not one frame.** Bernini is a video model; a lone
+  frame (`length=1`) is out-of-distribution and renders waxy/over-sharpened (plastic faces, crunchy hair
+  halos). Verified with a controlled test (same prompt/seed/res): `length=1` is plastic, a frame pulled
+  from a `length=9+` clip is a sharp natural photo. The engine therefore renders t2i/r2i as a short clip
+  (`--img-frames`, default 9) and keeps the middle frame. `i2i` (editing) stays `length=1` — it inherits
+  the source image's quality. For heavy *image* generation, a dedicated image model still wins; Bernini's
+  strengths are video + reference-guided editing.
+- **Multi-reference works; >2 degrades fidelity, not separation.** Verified: 2 refs (woman + fox) and even
+  3 refs (woman + man + fox) each bound to a *distinct* subject with no blending — the model separates them
+  fine. What drops past ~2 is per-subject *fidelity/detail*, not subject identification. Name refs
+  positionally (`image0`, `image1`, …) and keep them visually distinct.
 - **Don't go past 720p for batch work.** 1080p (`--max-size 1920`) is a *marginal* per-frame gain over
   720p and the time cost is **super-linear**, not linear: measured on a 5090 (portrait rv2v), 720p·81f =
   ~5.5 min, 1080p·**25f** = ~3 min, but 1080p·**81f** did not finish in 60 min (VRAM pinned ~32 GB, no

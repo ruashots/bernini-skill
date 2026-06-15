@@ -62,8 +62,9 @@ Inputs may be absolute paths (staged into ComfyUI's `input/` automatically) or f
 | `--ref IMG` | — | reference image (repeat for up to 8; **quality degrades past ~2**) |
 | `--source FILE` | — | source image or video to edit/animate (auto-detected by extension) |
 | `--content FILE` | — | image/video to insert (`ads2v` only) |
-| `--negative` | `"bad video"` | negative prompt |
-| `--frames N` | `81` | video length; **snapped to 8n+1** (81, 121, 145…); image tasks force 1 |
+| `--negative` | standard Wan-2.2 neg | the official `bytedance/Bernini` default negative (a full quality/anatomy suppressor — not the example's thin `"bad video"`) |
+| `--frames N` | `81` | video length; **snapped to 8n+1** (81, 121, 145…) |
+| `--img-frames N` | `9` | **t2i/r2i** render N frames (8n+1) and keep the **middle** one — a lone frame is out-of-distribution for this video model and comes out waxy; `1` = fast but low-quality |
 | `--width/--height` | from source / 1280×720 video / 1024² image | override the generation rectangle |
 | `--max-size N` | `1280` | long-edge cap when deriving size from a source — **720p, the production default**; use **`832` for a ~3× faster 480p draft** (or on a <24 GB card) |
 | `--steps N` | `6` | total sampler steps (hi-noise 0→split, lo-noise split→steps) |
