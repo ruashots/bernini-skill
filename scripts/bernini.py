@@ -287,13 +287,14 @@ def build_graph(task, src, refs, content, W, H, length, fps, sysprompt, prompt, 
             g["load_content"] = {"class_type": "LoadImage", "inputs": {"image": content}}
             g["bernini"]["inputs"]["reference_video"] = ["load_content", 0]
     # --- reference_images autogrow (r2v/r2i/rv2v/vi2v) ---
+    # ComfyUI resolves an Autogrow link only from a FLAT dotted-path key it can see as a top-level
+    # input value (execution.py build_nested_inputs restructures it). A nested dict buries the
+    # [node,slot] link where the executor never resolves it -> the reference is silently dropped.
     if refs:
-        slots = {}
         for i, rf in enumerate(refs):
             nid = f"load_ref_{i}"
             g[nid] = {"class_type": "LoadImage", "inputs": {"image": rf}}
-            slots[f"reference_image_{i}"] = [nid, 0]
-        g["bernini"]["inputs"]["reference_images"] = slots
+            g["bernini"]["inputs"][f"reference_images.reference_image_{i}"] = [nid, 0]
     # --- output ---
     if out_kind == "video":
         g["out"] = {"class_type": "VHS_VideoCombine", "inputs": {
