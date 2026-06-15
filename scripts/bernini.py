@@ -325,8 +325,8 @@ def run(a):
     if refpol == "req" and not a.ref: sys.exit(f"--task {a.task} needs at least one --ref image.")
     if refpol == "no" and a.ref: print(f"  note: --task {a.task} ignores --ref.")
     if needs_content and not a.content: sys.exit(f"--task {a.task} needs --content (image or video to insert).")
-    if a.ref and len(a.ref) > 8: sys.exit("Bernini accepts at most 8 reference images (and degrades past ~2).")
-    if a.ref and len(a.ref) > 2: print("  ⚠ >2 reference images: quality/identity separation degrades (model limitation).")
+    if a.ref and len(a.ref) > 8: sys.exit("Bernini's reference_images slot holds at most 8 (the node's hard ceiling).")
+    if a.ref and len(a.ref) > 2: print(f"  note: {len(a.ref)} references — your call; each one past ~2 trades away per-subject fidelity (subjects still stay distinct).")
     if not a.prompt and a.task not in ("t2v","t2i"): print("  ⚠ no --prompt: edits/refs need an instruction describing the result.")
 
     # stage inputs
