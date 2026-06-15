@@ -1,0 +1,267 @@
+{
+  "clip": {
+    "class_type": "CLIPLoader",
+    "inputs": {
+      "clip_name": "umt5_xxl_fp16.safetensors",
+      "type": "wan",
+      "device": "default"
+    }
+  },
+  "vae": {
+    "class_type": "VAELoader",
+    "inputs": {
+      "vae_name": "wan_2.1_vae.safetensors"
+    }
+  },
+  "unet_hi": {
+    "class_type": "UNETLoader",
+    "inputs": {
+      "unet_name": "Bernini\\wan2.2_bernini_r_high_noise_fp8_scaled.safetensors",
+      "weight_dtype": "default"
+    }
+  },
+  "unet_lo": {
+    "class_type": "UNETLoader",
+    "inputs": {
+      "unet_name": "Bernini\\wan2.2_bernini_r_low_noise_fp8_scaled.safetensors",
+      "weight_dtype": "default"
+    }
+  },
+  "sage_hi": {
+    "class_type": "PathchSageAttentionKJ",
+    "inputs": {
+      "model": [
+        "unet_hi",
+        0
+      ],
+      "sage_attention": "auto"
+    }
+  },
+  "sage_lo": {
+    "class_type": "PathchSageAttentionKJ",
+    "inputs": {
+      "model": [
+        "unet_lo",
+        0
+      ],
+      "sage_attention": "auto"
+    }
+  },
+  "lora_hi": {
+    "class_type": "LoraLoaderModelOnly",
+    "inputs": {
+      "model": [
+        "sage_hi",
+        0
+      ],
+      "lora_name": "WanVideo\\lightx2v_I2V_14B_480p_cfg_step_distill_rank256_bf16.safetensors",
+      "strength_model": 3.0
+    }
+  },
+  "lora_lo": {
+    "class_type": "LoraLoaderModelOnly",
+    "inputs": {
+      "model": [
+        "sage_lo",
+        0
+      ],
+      "lora_name": "WanVideo\\lightx2v_T2V_14B_cfg_step_distill_v2_lora_rank256_bf16.safetensors",
+      "strength_model": 1.5
+    }
+  },
+  "pos": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "text": "You are a helpful assistant specialized in video editing with reference.\n\nReplace the subject with the person from image0; preserve the original motion, framing and camera.",
+      "clip": [
+        "clip",
+        0
+      ]
+    }
+  },
+  "neg": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "text": "bad video",
+      "clip": [
+        "clip",
+        0
+      ]
+    }
+  },
+  "sched": {
+    "class_type": "BasicScheduler",
+    "inputs": {
+      "model": [
+        "unet_lo",
+        0
+      ],
+      "scheduler": "simple",
+      "steps": 6,
+      "denoise": 1.0
+    }
+  },
+  "split": {
+    "class_type": "SplitSigmas",
+    "inputs": {
+      "sigmas": [
+        "sched",
+        0
+      ],
+      "step": 3
+    }
+  },
+  "ksel": {
+    "class_type": "KSamplerSelect",
+    "inputs": {
+      "sampler_name": "res_multistep"
+    }
+  },
+  "bernini": {
+    "class_type": "BerniniConditioning",
+    "inputs": {
+      "positive": [
+        "pos",
+        0
+      ],
+      "negative": [
+        "neg",
+        0
+      ],
+      "vae": [
+        "vae",
+        0
+      ],
+      "width": 720,
+      "height": 1280,
+      "length": 81,
+      "batch_size": 1,
+      "ref_max_size": 848,
+      "source_video": [
+        "load_src",
+        0
+      ],
+      "reference_images": {
+        "reference_image_0": [
+          "load_ref_0",
+          0
+        ]
+      }
+    }
+  },
+  "samp_hi": {
+    "class_type": "SamplerCustom",
+    "inputs": {
+      "model": [
+        "lora_hi",
+        0
+      ],
+      "add_noise": true,
+      "noise_seed": 42,
+      "cfg": 1.0,
+      "positive": [
+        "bernini",
+        0
+      ],
+      "negative": [
+        "bernini",
+        1
+      ],
+      "sampler": [
+        "ksel",
+        0
+      ],
+      "sigmas": [
+        "split",
+        0
+      ],
+      "latent_image": [
+        "bernini",
+        2
+      ]
+    }
+  },
+  "samp_lo": {
+    "class_type": "SamplerCustom",
+    "inputs": {
+      "model": [
+        "lora_lo",
+        0
+      ],
+      "add_noise": false,
+      "noise_seed": 42,
+      "cfg": 1.0,
+      "positive": [
+        "bernini",
+        0
+      ],
+      "negative": [
+        "bernini",
+        1
+      ],
+      "sampler": [
+        "ksel",
+        0
+      ],
+      "sigmas": [
+        "split",
+        1
+      ],
+      "latent_image": [
+        "samp_hi",
+        0
+      ]
+    }
+  },
+  "decode": {
+    "class_type": "VAEDecode",
+    "inputs": {
+      "samples": [
+        "samp_lo",
+        0
+      ],
+      "vae": [
+        "vae",
+        0
+      ]
+    }
+  },
+  "load_src": {
+    "class_type": "VHS_LoadVideo",
+    "inputs": {
+      "video": "source.mp4",
+      "force_rate": 0,
+      "custom_width": 0,
+      "custom_height": 0,
+      "frame_load_cap": 81,
+      "skip_first_frames": 0,
+      "select_every_nth": 1,
+      "format": "Wan"
+    }
+  },
+  "load_ref_0": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "reference.png"
+    }
+  },
+  "out": {
+    "class_type": "VHS_VideoCombine",
+    "inputs": {
+      "images": [
+        "decode",
+        0
+      ],
+      "frame_rate": 24.0,
+      "loop_count": 0,
+      "filename_prefix": "Bernini/bernini_rv2v",
+      "format": "video/h264-mp4",
+      "pix_fmt": "yuv420p",
+      "crf": 19,
+      "save_metadata": true,
+      "trim_to_audio": false,
+      "pingpong": false,
+      "save_output": true
+    }
+  }
+}
